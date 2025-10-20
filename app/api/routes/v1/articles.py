@@ -37,6 +37,38 @@ async def create_article(
 
 
 @router.get(
+    "/me",
+    response_model=PaginatedResponse[ArticleListResponse],
+    summary="Get my articles",
+    description="Get articles created by the current user"
+)
+async def get_my_articles(
+    pagination: PaginationParams = Depends(),
+    status_filter: Optional[ArticleStatus] = Query(None, alias="status"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+) -> PaginatedResponse[ArticleListResponse]:
+    """Get current user's articles."""
+    article_service = ArticleService(db)
+    
+    articles = await article_service.list_articles(
+        skip=pagination.skip,
+        limit=pagination.size,
+        status=status_filter,
+        author_id=current_user.id
+    )
+    total = await article_service.count_articles(status=status_filter, author_id=current_user.id)
+    
+    return PaginatedResponse(
+        data=[ArticleListResponse.from_orm(article) for article in articles],
+        total=total,
+        page=pagination.page,
+        size=pagination.size,
+        pages=(total + pagination.size - 1) // pagination.size
+    )
+
+
+@router.get(
     "/",
     response_model=PaginatedResponse[ArticleListResponse],
     summary="List articles",
